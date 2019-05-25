@@ -65,3 +65,75 @@ deque中可能拥有很多方法，但queue中只通过deque提供了非常少�
 ![1558718827030](assets/1558718827030.png)
 
 团队开发了CDocument类，定义Serialize函数需要重新定义，在OnFileOpen函数中的省略号即为打包好的过程。用CDocument类的人只需重新定义Serialize函数即可，则在main函数中，先创建一个CMyDoc实例myDoc，调用myDoc.OnFileOpen函数，子类没有定义这个函数，实则调用的是父类的函数，即CDocument::OnFileOpen(&myDoc), 进入父类函数中，运行打包好的过程，当运行到Serialize函数时，发现子类重新定义了它，则调用子类重新定义的Serialize函数，最后再返回到CDocument::OnFileOpen，继续下面的过程。再也不用写一般的步骤了，完美！这是一种非常有名的设计模式Template method（不是说C++ template），提供了一种应用框架，它将重复一样的操作写好，不确定的步骤留给实际应用设计者重新实现。十年前最有名的产品MFC就是这样一种应用框架。
+
+深层次的理解，谁调用函数，this就是谁，当调用Serialize函数是，编译器是通过this->Serialize()调用，于是就调用到了this重新定义的Serialize函数。
+
+![1558752779674](assets/1558752779674.png)
+
+上图就是CDocument和CMyDoc的实例，用cout来模拟步骤，呼应上面两张图片。
+
+## Inheritance + Composition关系下的构造与析构
+
+![1558753009197](assets/1558753009197.png)
+
+当同时存在继承和复合，类是如何进行构造和析构呢？这一节要讨论的问题：
+
+1. 子类有父类的成分还有包含着另一个类；
+2. 子类继承父类，父类拥有另外一个类。
+
+情况2就很明显了，构造依然是自内而外，析构是由外而内。
+
+对于情况1，这是侯捷老师留的作业，自己写代码判断，我写了一个：
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+class Base;
+class Derived;
+class Component;
+
+class Base{
+public:
+    Base() {cout << "Base Ctor" << endl;}
+    virtual ~Base() {cout << "Base Dtor" << endl;}
+};
+
+class Component{
+public:
+    Component() {cout << "Component Ctor" << endl;};
+    ~Component() {cout << "Component Dtor" << endl;};
+};
+
+class Derived : Base{
+public:
+    Derived() {cout << "Derived Ctor" << endl;}
+    ~Derived() {cout << "Derived Dtor" << endl;}
+protected:
+    Component c;
+};
+
+int main() {
+    {Derived d;}
+    cin.ignore();
+    return 0;
+}
+```
+
+运行结果为：
+
+```bash
+Base Ctor
+Component Ctor
+Derived Ctor
+Derived Dtor
+Component Dtor
+Base Dtor
+```
+
+可以看到先初始化父类（Base），然后再初始化Component类，再初始化自己，析构与构造相反。
+
+下图也给出了结论。
+
+![1558760439215](assets/1558760439215.png)
