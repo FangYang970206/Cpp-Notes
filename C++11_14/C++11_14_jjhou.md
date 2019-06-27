@@ -71,7 +71,7 @@ C++11提供了一个std::initializer_list<>, 可以接受任意个数的相同�
 
 ![1561554777156](assets/1561554777156.png)
 
-左下脚是新东西，其他的之前出现过了，第一句话是指initializer_list背后有一个array在支撑，第二句话是说initializer_list并没有包含那个array，只是有一个指针指向那个array的头部和一个size_t等于array的长度。如果拷贝initializer_list，只是浅拷贝，指向同一个array以及得到同一个长度。最后一句话是说那个临时array的生命周期与initializer_list是相同的。
+左下角是新东西，其他的之前出现过了，第一句话是指initializer_list背后有一个array在支撑，第二句话是说initializer_list并没有包含那个array，只是有一个指针指向那个array的头部和一个size_t等于array的长度。如果拷贝initializer_list，只是浅拷贝，指向同一个array以及得到同一个长度。最后一句话是说那个临时array的生命周期与initializer_list是相同的。
 
 ![1561555267366](assets/1561555267366.png)
 
@@ -89,4 +89,80 @@ C++11提供了一个std::initializer_list<>, 可以接受任意个数的相同�
 
 ![1561556005409](assets/1561556005409.png)
 
-之前一张图是只有一个实参，这里是多个实参的例子，当使用运行p3{77, 5, 42}的时候，直接调用的是带有initializer_list的构造函数，而p5 = {77, 5, 42}, {77, 5, 42}是initialization_list<int>类型，对应的p5也是initialization_list<int>，它不能隐式转成P，更详细的可以参考https://stackoverflow.com/questions/30142484/explicit-constructor-and-initialization-with-stdinitializer-list/30142573 ，提问一模一样。
+之前一张图是只有一个实参，这里是多个实参的例子，当使用运行p3{77, 5, 42}的时候，直接调用的是带有initializer_list的构造函数（一致性初始化），而p5 = {77, 5, 42},  {77, 5, 42}是initialization_list<int>类型，不能隐式将initialization_list<int>转成各个int，更详细的可以参考https://stackoverflow.com/questions/30142484/explicit-constructor-and-initialization-with-stdinitializer-list/30142573 ，提问一模一样。我自己也进行了测试，发现P p5 = {77, 5, 42}并没有报错，它调用的是initialization_list<int>的构造函数，可能使用的编译器不一样，导致结果也不一样，我使用的是Clion+MinGW。但一样的，如果没有initialization_list<int>的构造函数，就会报错，原因上面说了。
+
+### for each
+
+![1561606171002](assets/1561606171002.png)
+
+这一小节讲的是非常实用的for，C++11提供了range-based for，如上所述，decl是申明，coll是容器，意思是一个个拿出coll中的元素，下面有实例，可以搭配auto使用，非常方便，需要in-place的话，加上&即可。
+
+![1561606408112](assets/1561606408112.png)
+
+左边是range-based for，右边是编译器对它的解释。
+
+![1561606683917](assets/1561606683917.png)
+
+这是explicit的一个例子，禁止编译器隐式将String转化C，所以会报错。
+
+### =default， =delete
+
+![1561615144711](assets/1561615144711.png)
+
+=default要的是编译器给的default ctor，=delete是不要对应的ctor，例如，上述的`Zoo(const Zoo&)=delete`是说不要拷贝构造，`Zoo(const Zoo&&)=default`是说要编译器默认给我的那一个。
+
+![1561615997563](assets/1561615997563.png)
+
+![1561616013503](assets/1561616013503.png)
+
+![1561616128477](assets/1561616128477.png)
+
+以上三张图是C++标准库中使用=default和=delete的事例，标准库都用了，那自然是好的。（这里注意析构函数不能用=delete，可能会出大问题）
+
+![1561616221927](assets/1561616221927.png)
+
+构造函数可以有多个版本，上述定义了两个Foo的构造函数，一个是有实参的，另一个使用=default得到编译器默认给出的构造函数。对于拷贝构造而言，只能允许一个，所以当使用=default的时候，由于已经写出一个了，就无法进行重载了，而使用=delete的时候，由于写出来了，无法进行删除了。拷贝赋值情况类似。对于一般函数来说，没有default版本，所以对一般函数进行=default是不对的，但=delete可以有，但没必要，写出来不要还不如不写。上图中还给出了=default，=delete与=0的区别，区别在与=default只能用于big-five(构造函数，拷贝构造，赋值构造，析构，移动构造，移动赋值)， =delete可以用于任何函数，但有时没有必要使用，如上面所说，而=0只能用于虚函数，代表纯虚函数。
+
+![1561617356511](assets/1561617356511.png)
+
+对于一个空的class，C++会在空的class内部插入一些代码（默认的构造函数，拷贝构造，拷贝赋值以及析构函数，都是public并且是inline的），这样才会使左下角的的代码运行正常，作用还不止这些，这些默认的函数还给编译器放置藏身幕后的一些代码，比如当涉及继承的时候，调用base classes的构造和析构就会对应放置在默认生成的构造和析构当中。
+
+![1561617793229](assets/1561617793229.png)
+
+如果一个类带有pointer member，则需要自己定义big-three，而没有pointer member的话，用编译器默认提供的就足够了。上面的complex就是直接使用编译器默认提供的拷贝赋值和析构。更详细的推荐看我写的面向对象程序设计_part1部分的笔记，有非常详细的讲述。
+
+![1561618425129](assets/1561618425129.png)
+
+上图是=default和=delete的使用事例，class NoCopy把拷贝构造和拷贝赋值都=delete，也就是没有这两个了，不允许外界去拷贝这个类的对象，这个在一些事例上是有用的。class NoDtor则不要析构函数了，对象创建无法删除，会报错。（一般不会这么使用）最后的PrivateCopy把拷贝构造和拷贝赋值放入了private里面，这限制了访问这两个函数的使用者，一般用户代码无法调用，但友元以及成员可以进行拷贝。
+
+![1561619185785](assets/1561619185785.png)
+
+这是一个Boost库的例子，与上述的PrivateCopy一样，它的作用是让其他类继承这个类，这样其他类也拥有noncopyable同样的性质。
+
+### Alias Template 与 Template Template parameter
+
+![1561620986751](assets/1561620986751.png)
+
+C++11引入了Alias Template，用法如上所示，先些template <typename T> , 然后使用using命令设定别名模板，这样些可以自己设定类型以及容器的分配器。而使用define和typedef确不能达到效果。但别名模板有一个限制，不能进行偏特化（可以参考面向对象的笔记了解什么是偏特化）
+
+![1561622745241](assets/1561622745241.png)
+
+Alias template难道只是少打几个字吗? 不是的，上图进行说明，函数test_moveable测试不同容器的move操作（右值引用）和拷贝操作的时间比较，想使用容器和元素的类型，这是天方夜谈的，container和T是不能再函数内部使用，报出了三个错误。然后再进行改进，改成右边形式的，利用函数模板的实参推导可以推出Container和T的类型，不然依然是天方夜谭，编译器不认识Container是个模板，无法使用尖括号<T>.
+
+![1561625490878](assets/1561625490878.png)
+
+这一页在Container前面加上了typename，告诉编译器Container<T>就是一个typename，然而编译器还是报错，认为期望嵌套名称说明符在Container前面，还是无法识别模板。
+
+![1561626345740](assets/1561626345740.png)
+
+上图就是解决方案，传入的实参只有一个，根据模板函数的自动推导，得到它的迭代器（前面要加typename），然后通过一个迭代器萃取机引出对象的Value_type, 然后根据typedef得到值类型，这样就不会报错了。然后看右上角黄色的话语，如果没有iterator和traits，该怎么解决这一问题呢？上面就是思考路径，在模板接受模板，能不能从中取出模板的参数？
+
+这就需要template template parameter了。
+
+![1561627676584](assets/1561627676584.png)
+
+模板模板参数是模板嵌套模板，如上面所示，XCI接受两个参数，第一个是T，第二个是模板Container，然后就可以直接使用`Container<T> c;` 因为Container是一个模板，但再调用`XCIs<Mystring, vector> c1;`的时候，出现报错，原因是vector有两个模板参数，第二个模板参数（分配器）是默认的，但编译器不知道，这个时候就需要用到Alias Template了。
+
+![1561628332035](assets/1561628332035.png)
+
+使用Alias Template，就可以将Vec变为一个模板参数的模板，然后就可以初始化对象了。可以看到Alias Template不仅是少打几个字，还有减少模板参数个数以适配模板模板参数，非常有用处。
