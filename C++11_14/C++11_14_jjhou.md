@@ -91,7 +91,7 @@ C++11提供了一个std::initializer_list<>, 可以接受任意个数的相同�
 
 之前一张图是只有一个实参，这里是多个实参的例子，当使用运行p3{77, 5, 42}的时候，直接调用的是带有initializer_list的构造函数（一致性初始化），而p5 = {77, 5, 42},  {77, 5, 42}是initialization_list<int>类型，不能隐式将initialization_list<int>转成各个int，更详细的可以参考https://stackoverflow.com/questions/30142484/explicit-constructor-and-initialization-with-stdinitializer-list/30142573 ，提问一模一样。我自己也进行了测试，发现P p5 = {77, 5, 42}并没有报错，它调用的是initialization_list<int>的构造函数，可能使用的编译器不一样，导致结果也不一样，我使用的是Clion+MinGW。但一样的，如果没有initialization_list<int>的构造函数，就会报错，原因上面说了。
 
-### for each
+### range-based for
 
 ![1561606171002](assets/1561606171002.png)
 
@@ -257,7 +257,89 @@ C++11介绍了lambdas（可以说是匿名函数或仿函数），允许定义�
 
 ### Variadic Template （重磅原子弹）
 
+#### print函数的例子
+
 ![1561713015542](assets/1561713015542.png)
 
-Variadic Template是指数量不定，类型不定的模板，这是C++11原子弹级别的炸弹，如上所示的print函数，可以看到接受了不同类型的参数，调用的函数就是拥有Variadic Template的函数，`print(7.5, "hello", bitset<16>(377), 42)`运行的时候，首先会7.5作为firstArg，剩余部分就是一包，然后在函数内部，继续递归调用print函数，然后把"hello"作为firstArg, 其余的作为一包，一直递归直到一包中没有数据，调用边界条件的print（空函数）结束。函数的`...`表示一个包，可以看到，用在三个地方，第一个地方是模板参数加了`...` ，这代表模板参数包，可以指代不同数量不同类型的模板参数，第二个就是函数参数类型包（`Type&...`), 指代不同类型的参数，最后就是函数参数包——不同类型不同数量的参数。
+Variadic Template是指数量不定，类型不定的模板，这是C++11原子弹级别的炸弹，如上所示的print函数，可以看到接受了不同类型的参数，调用的函数就是拥有Variadic Template的函数，`print(7.5, "hello", bitset<16>(377), 42)`运行的时候，首先会7.5作为firstArg，剩余部分就是一包，然后在函数内部，继续递归调用print函数，然后把"hello"作为firstArg, 其余的作为一包，一直递归直到一包中没有数据，调用边界条件的print（空函数）结束。
+
+函数的`...`表示一个包，可以看到，用在三个地方，
+
+- 第一个地方是模板参数`typename...` ，这代表模板参数包。
+
+- 第二个就是函数参数类型包（`Type&...`), 指代函数参数类型包。
+
+- 第三个就是函数参数包`args...`，指的是函数参数包。
+
+  另外，还可以使用`sizeof...(args)`得到包的长度。右边的是另外一种类型的print，可以和左边的print共同存在，我测试了一下：
+
+```c++
+#include <iostream>
+#include <bitset>
+
+using namespace std;
+
+void print() {};
+
+template <typename T, typename... Types>
+void print(const T& firstArg, const Types&... args)
+{
+    cout << firstArg << endl;
+    print(args...);
+}
+
+template <typename... Types>
+void print(const Types&... args)
+{
+    cout << "common print" << endl;
+}
+
+int main() {
+    print(7.5, "hello", bitset<16>(377), 42);
+    return 0;
+}
+```
+
+输出的结果如下：
+
+```bash
+7.5
+hello
+0000000101111001
+42
+```
+
+可以看到调用的还是左边的print，至于为什么，后面再说！
+
+#### 哈希表的例子
+
+![1561717430124](assets/1561717430124.png)
+
+上面这个是用variadic template实现哈希表的过程，CustomerHash重载了小括号操作符，内部调用了hash_val，有三个参数，调用的是前面有圆圈1的hash_val，因为其他的hash_val第一参数不符合，然后这个hash_val函数里面设定种子（seed），调用带有圆圈2的hash_val函数，取出第一个值，调用hash_combine重新设定seed,然后再递归调用圆圈2的hash_val, 再重新得到新种子，直到`arg...`只有一个参数的时候, 调用圆圈3的hash_val函数，hash_val函数调用hash_combine函数，得到最后的seed，即为哈希值。
+
+#### tuple例子
+
+![1561723021811](assets/1561723021811.png)
+
+C++11还引入了一种新的容器，名为tuple，可以容纳不同类型的数据，左边是它的简单实现，关注继承那三行代码，可以看到tuple的模板参数是一个`Head`和一个包`...Tail`，继承的却是`private tuple<...Tail>`，而`tuple<...Tail>`还是tuple，所以又会拆分成`tuple<Head, ...Tail>`，不断递归，形成一种递归继承，终止条件就是空的tuple类，在左上角定义的，如果定义`tuple<int, float, string>`，它的具体形式如右上角所示，是不断继承的结构，这就是能容纳不同类型的原因，中上角也是类似的抽象关系。tuple初始化先初始化Head，然后初始化继承的inherited，继承的inherited也会类似初始化，直到到达空的tuple，还给出tuple的两个函数head()和tail()，head()直接返回的是tuple的数据，而调用tail()返回this指针，经过向上转型得到inherited的地址。
+
+以上是开头讲的variadic template，现在进入正式讲解variadic template的环节。
+
+![1561725331121](assets/1561725331121.png)
+
+先回顾了template，一般的模板有函数模板，类模板以及成员模板，强大的还是可变化的模板参数，变化表现在参数个数也表现在参数类型，利用参数个数逐一递减的特性，实现函数的递归调用，同时个数上的递减也会导致参数类型也逐一递减，从而实现递归继承（tuple）以及递归复合。最下面的是函数使用variadic template一种常见的写法。
+
+![1561728160229](assets/1561728160229.png)
+
+这页幻灯片前面已经讲述了，不过这里给出了之前幻灯片中的一个疑问，`print(7.5, "hello", bitset<16>(377), 42)`为什么调用左边的函数，而不是右边的，这是因为模板有特化的概念，相对于圆圈3实现的printX（泛化），圆圈1实现的printX更加特化，所以会调用左边的函数。
+
+![1561728415477](assets/1561728415477.png)
+
+上面这是使用variadic template实现C语言的printf，很简洁的写法。前面的`"%d %s %p %f\n"`是第一个参数s，后面的参数构造与print类似，一次取一个对象，参数s用以printf里面的循环条件，当`*s`非空时，
+
+- 如果`*s`等于`'%'`且下一个字符不等于`%`，则打印取出的对象，同时递归调用printf函数，要对字符指针进行自加移位。
+
+- 如果上述条件不成立，则打印`*s++`
+
+最后的终止条件是`args...`为空，打印完了，调用边界条件的printf，对剩余的`*s`进行打印，还要进行`%`判断，因为已经打印完了，还有符合条件的`%`,则需要抛出异常。
 
