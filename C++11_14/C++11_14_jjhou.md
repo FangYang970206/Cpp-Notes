@@ -321,7 +321,7 @@ hello
 
 ![1561723021811](assets/1561723021811.png)
 
-C++11还引入了一种新的容器，名为tuple，可以容纳不同类型的数据，左边是它的简单实现，关注继承那三行代码，可以看到tuple的模板参数是一个`Head`和一个包`...Tail`，继承的却是`private tuple<...Tail>`，而`tuple<...Tail>`还是tuple，所以又会拆分成`tuple<Head, ...Tail>`，不断递归，形成一种递归继承，终止条件就是空的tuple类，在左上角定义的，如果定义`tuple<int, float, string>`，它的具体形式如右上角所示，是不断继承的结构，这就是能容纳不同类型的原因，中上角也是类似的抽象关系。tuple初始化先初始化Head，然后初始化继承的inherited，继承的inherited也会类似初始化，直到到达空的tuple，还给出tuple的两个函数head()和tail()，head()直接返回的是tuple的数据，而调用tail()返回this指针，经过向上转型得到inherited的地址。
+C++11还引入了一种新的容器，名为tuple，可以容纳不同类型的数据，左边是它的简单实现，关注继承那三行代码，可以看到tuple的模板参数是一个`Head`和一个包`...Tail`，继承的却是`private tuple<...Tail>`，而`tuple<...Tail>`还是tuple，所以又会拆分成`tuple<Head, ...Tail>`，不断递归，形成一种递归继承，终止条件就是空的tuple类，在左上角定义的，如果定义`tuple<int, float, string>`，它的具体形式如右上角所示，是不断继承的结构，这就是能容纳不同类型的原因，中上角也是类似的抽象关系。tuple初始化先初始化Head，然后初始化继承的inherited，继承的inherited也会类似初始化，直到到达空的tuple，还给出tuple的两个函数head()和tail()，head()直接返回的是当前类本身的数据（不是从父类继承过来的），而调用tail()返回this指针（指向当前的那一块内存），经过向上转型得到inherited的地址（指向当前继承的那一块）。
 
 以上是开头讲的variadic template，现在进入正式讲解variadic template的环节。
 
@@ -333,6 +333,8 @@ C++11还引入了一种新的容器，名为tuple，可以容纳不同类型的�
 
 这页幻灯片前面已经讲述了，不过这里给出了之前幻灯片中的一个疑问，`print(7.5, "hello", bitset<16>(377), 42)`为什么调用左边的函数，而不是右边的，这是因为模板有特化的概念，相对于圆圈3实现的printX（泛化），圆圈1实现的printX更加特化，所以会调用左边的函数。
 
+#### printf例子
+
 ![1561728415477](assets/1561728415477.png)
 
 上面这是使用variadic template实现C语言的printf，很简洁的写法。前面的`"%d %s %p %f\n"`是第一个参数s，后面的参数构造与print类似，一次取一个对象，参数s用以printf里面的循环条件，当`*s`非空时，
@@ -343,3 +345,40 @@ C++11还引入了一种新的容器，名为tuple，可以容纳不同类型的�
 
 最后的终止条件是`args...`为空，打印完了，调用边界条件的printf，对剩余的`*s`进行打印，还要进行`%`判断，因为已经打印完了，还有符合条件的`%`,则需要抛出异常。
 
+![1561787721037](assets/1561787721037.png)
+
+给定一包数据，找出它们的最大值，也可以通过variadic template实现，不过当数据的类型都相同的时候，无需动用大杀器，使用initializer_list足矣。上面是max使用initializer_list的实现，由于使用initializer_list，所以需要讲数据用大括号包起来，编译器会自动生成initializer_list，然后调用max_element函数得到最大值的地址，然后加`*`得到最大值，而max_element是一个模板函数，调用的是`__max_element`函数，`__max_element`函数内部使用了`__iter_less_iter`类得到一个比大小的临时对象，然后使用临时对象重载操作符的方法对每一个元素进行比较，最后返回最大值的地址。
+
+![1561788622372](assets/1561788622372.png)
+
+上面是variadic template实现的方法， 采用的是递归策略，很好懂的。还可以进行改进，讲上图中的int换成模板参数T的话，那么maximum方法就可以接受所有的类型的参数，混合在一起比较（比如double和int混合）。
+
+#### tuple输出操作符
+
+![1561789478633](assets/1561789478633.png)
+
+tuple重载的输出流操作符，也使用variadic template，运行右边的那行代码，将得到下面黑色的输出，make_tuple函数是根据参数（可以任意个，内部估计也是使用了variadic template），初始化得到一个tuple，可以看到输出流操作符得第二个参数就是可变模板参数的tuple，内部调用PRINT_TUPLE类中的静态print函数，PRINT_TUPLE有三个模板参数，第一个当前索引IDX，第二个是tuple内含有MAX个对象，第三个就是模板参数包。通过`get<IDX>(t)`可以得到tuple的第IDX元素，然后进行输出，依次递归调用print函数，如果IDX是最后一个元素了满足`IDX+1==MAX`, 输出`""`，然后调用终止的`PRINT_TUPLE::print`函数(空的)完成打印。
+
+#### tuple补充
+
+![1561792248957](assets/1561792248957.png)
+
+上图之前讲过了，这里有一句话很有意思，递归调用处理的是参数，使用function template，递归继承处理的是类型，使用的是class template。
+
+![1561792840864](assets/1561792840864.png)
+
+不过上述的代码编译时不通过的，因为`HEAD::type`这个原因（比如int::type是没有的)。
+
+![1561792943974](assets/1561792943974.png)
+
+然后修改成这样，使用decltype进行类型推导，得到返回类型。不过需要把数据移到上面取，太离谱了。
+
+![1561793021661](assets/1561793021661.png)
+
+最终发现直接返回Head就可以了，侯捷老师考虑太复杂了哈哈哈。
+
+![1561796395862](assets/1561796395862.png)
+
+之前的tuple是通过递归继承来实现的，上图展示了如何通过递归复合来实现tuple，原理与之前的类似，数据多了Composited类型的m_tail, 依次不断递归，直到最后复合到空的tuple。
+
+variadic template到此结束，真的很强大！
