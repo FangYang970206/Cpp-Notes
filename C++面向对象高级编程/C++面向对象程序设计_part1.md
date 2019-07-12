@@ -1,5 +1,7 @@
 # C++面向对象程序设计_Part1
 
+​								作者：方阳，笔记地址：https://github.com/FangYang970206/Cpp-Notes
+
 C++笔记主要参考侯捷老师的课程，这是一份是C++面向对象程序设计（Object Oriented Programming）的part1部分，这一部分讲述的是以良好的习惯构造C++类，基于对象（object based）讲述了两个c++类的经典实例——complex类和string类。看这份笔记需要有c++和c语言的基础，有一些很基础的不会解释。
 
 [TOC]
