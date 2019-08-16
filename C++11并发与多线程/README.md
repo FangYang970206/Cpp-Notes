@@ -226,3 +226,35 @@ int main()
 }
 ```
 
+## 3. 线程传参详解，detach()大坑，成员函数做线程函数
+
+### 3.1 传递临时对象作为线程参数
+
+```c++
+#include <thread>
+#include <iostream>
+
+using namespace std;
+
+void my_print(const int& i, char* p)
+{
+	cout << "线程开始启动" << endl;
+	cout << "i: " << i << " i地址：" << &i << endl;
+	cout << "p: " << p << " p地址：" << (int*)(p) << endl;
+	cout << "线程结束运行" << endl;
+}
+
+int main()
+{
+	int m = 6;
+	char my_buf[] = "this is a test";
+	cout << "m的地址: " << &m << endl;
+	cout << "my_buf的地址：" << &my_buf << endl;
+	thread myobj(my_print, m, my_buf);
+	myobj.join();
+	cout << "i love china" << endl;
+	cin.ignore();
+	return 0;
+}
+```
+
