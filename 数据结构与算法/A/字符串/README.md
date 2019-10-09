@@ -1,5 +1,7 @@
 # 串
 
+[TOC]
+
 串通常是由字母表组成，也就是ASCII字符集组成的有限字符串序列。这里讨论有关串的算法。将以C++语言实现, 在C++中，串指的是string这种数据结构。
 
 ## 基本术语
@@ -80,9 +82,9 @@ int match(string P, string T) {
 
 暴力匹配算法存在着冗余的问题，当最坏情况时，最后一个字符匹配失败，模式串和文本串的指针都要发生回退。
 
-KMP算法的原理是利用Pattern构建一个查询表，根据查询表进行来指导移动位数，并且文本的索引不需要回退。理解这种算法我推荐阮一峰老师的[KMP博客](http://www.ruanyifeng.com/blog/2013/05/Knuth–Morris–Pratt_algorithm.html)，讲得非常清晰，非常直观。
+KMP算法的原理是利用Pattern构建一个查询表，根据查询表进行来指导移动位数，并且文本的索引不需要回退。理解这种算法我推荐阮一峰老师的[KMP博客](http://www.ruanyifeng.com/blog/2013/05/Knuth–Morris–Pratt_algorithm.html)（真心推荐看看），讲得非常清晰，非常直观。
 
-假设你看过这篇博客知道原理了，现在来看next表的构建代码:
+假设你看过阮老师的博客知道原理了，现在来看next表的构建代码:
 
 ```c++
 vector<int> buildNext(string P) { //构造模式串P的next表
@@ -145,5 +147,116 @@ int match(string P, string T) {
 
 KMP算法的时间复杂度是$O(m + n)$, 空间复杂度是$O(m+n)$. 匹配过程令k = 2i- j，k每次循环至少加1，判断为真则i加1，判断为假，j至少减1，所以k <= 2n - 1; 同理next过程也是如此。
 
+KMP小结：
+
+- 以判断公共前后缀来进行模式串的移动，有公共前后缀，移动到前缀的下一位即可，没有公共前后缀则移动到头部。
+- 通过通配符来有效构造next表，表的第一位为-1，当第一位对齐不相等的时候，这时通配符匹配，使文本串（也包括模式串的自我匹配）可以移动起来，不至于卡死。
+- 当发生重复串的时候，跳过他们，不进行比较。
+
 ### BM算法
 
+对于BM算法的介绍，我同样推荐看阮一峰老师的[BM博客](http://www.ruanyifeng.com/blog/2013/05/boyer-moore_string_search_algorithm.html)（真心推荐看看），讲的十分清楚。同样假设你看过博客知道原理了，就知道BM算法有两个next表，一个是坏字符（bad character）bc表，另一个是好后缀（good suffix）gs表，现在来看看如何构造这两个表。
+
+#### bc表
+
+对于坏字符表，构造起来很简单，它是记录模式串中每种字符最后出现的位置，代码如下：
+
+```c++
+vector<int> buildBC(string P){
+    vector<int> bc(256, -1);
+    for(size_t m = P.size(), j = 0; j < m; j++)
+        bc[ P[j] ] = j;
+    return bc;
+}
+```
+
+坏字符移动规则： **后移位数 = 坏字符的位置- 搜索词中的上一次出现位置**
+
+基于BM-DC的算法最好情况就是$O(n/m)$, 最坏情况是$O(m*n)$。
+
+最好情况：
+
+![1570613990056](assets/1570613990056.png)
+
+最坏情况：
+
+![1570614018748](assets/1570614018748.png)
+
+#### gs表
+
+相比于bc表，gs表就很不好构造了。首先来看看一个概念，最大匹配后缀长度表，通过它来构建ss（suffix size)表，然后通过ss表来构造gs表。
+
+最大匹配后缀长度的意思是在P[0,j)的所有缀中，与P的某一后缀匹配最长者。例如下面的P[0, 3) = ICE, 与末尾的ICE最长匹配，则P[0, 3)的末尾就为最长匹配长度3，RICE同理。（ss表的值就等于最大匹配长度）
+
+![1570614568268](assets/1570614568268.png)
+
+ss表末尾的值就是整个模式串的长度，简单的想法是遍历每一个字符向后递减，与后缀开始一一比较(暴力搜索），这样做的复杂度为$O(m^2)$, 很好的做法是下面的代码（从后往前遍历），时间复杂度只有$O(m)$。
+
+```c++
+vector<int> buildSS ( string P ) { //构造最大匹配后缀长度表：O(m)
+    int m = P.size(); 
+    vector<int> ss(m, 0); //Suffix Size表
+    ss[m - 1]  =  m; //对最后一个字符而言，与之匹配的最长后缀就是整个P串
+// 以下，从倒数第二个字符起自右向左扫描P，依次计算出ss[]其余各项
+    for ( int lo = m - 1, hi = m - 1, j = lo - 1; j >= 0; j -- )
+        if ( ( lo < j ) && ( ss[m - hi + j - 1] <= j - lo ) ) //情况一：该情况处于最大匹配后缀后的字符，例如，RICE中的R,I,C.
+            ss[j] =  ss[m - hi + j - 1]; //直接利用此前已计算出的ss[]
+        else { //情况二: 遇到匹配项，依次递减进行匹配
+            hi = j; lo = min ( lo, hi );
+            while ( ( 0 <= lo ) && ( P[lo] == P[m - hi + lo - 1] ) ) 
+                lo--; //逐个对比处于(lo, hi]前端的字符
+            ss[j] = hi - lo; // 高位减去递减后的低位，得到最长匹配长度
+        }
+    return ss;
+}
+```
+
+知道ss表后，gs表可有ss表推导出，有两种情况：
+
+![1570620227448](assets/1570620227448.png)
+
+对应的代码如下：
+
+```c++
+vector<int> buildGS ( string P ) { //构造好后缀位移量表：O(m)
+   vector<int> ss = buildSS ( P ); //Suffix Size表
+   size_t m = P.size(); 
+   vector<int> gs(m, m); //Good Suffix shift table
+   for ( size_t i = 0, j = m - 1; j < UINT_MAX; j -- ) //逆向逐一扫描各字符P[j]
+      if ( j + 1 == ss[j] ) //若P[0, j] = P[m - j - 1, m)，则
+         while ( i < m - j - 1 ) //对于P[m - j - 1]左侧的每个字符P[i]而言
+            gs[i++] = m - j - 1; //m - j - 1都是gs[i]的一种选择
+   for ( size_t j = 0; j < m - 1; j ++ ) //正向扫描P[]各字符，gs[j]不断递减，直至最小
+      gs[m - ss[j] - 1] = m - j - 1; //m - j - 1必是其gs[m - ss[j] - 1]值的一种选择
+   return gs;
+}
+```
+
+#### BM_BC+GS
+
+知道了bc表和gs表，接下来就是匹配过程了，与阮老师的博客上说的一致，取两个表的最大值。代码如下：
+
+```c++
+int match ( string P, string T ) { //Boyer-Morre算法（完全版，兼顾Bad Character与Good Suffix）
+   vector<int> bc = buildBC ( P ), gs = buildGS ( P ); //构造BC表和GS表
+   size_t i = 0; //模式串相对于文本串的起始位置（初始时与文本串左对齐）
+   while ( T.size() >= i + P.size() ) { //不断右移（距离可能不止一个字符）模式串
+      int j = P.size() - 1; //从模式串最末尾的字符开始
+      while ( P[j] == T[i + j] ) //自右向左比对
+         if ( 0 > --j ) break; 
+      if ( 0 > j ) //若极大匹配后缀 == 整个模式串（说明已经完全匹配）
+         break; //返回匹配位置
+      else //否则，适当地移动模式串
+         i += max ( gs[j], j - bc[ T[i + j] ] ); //位移量根据BC表和GS表选择大者
+   }
+   return i;
+}
+```
+
+基于BM_BC+GS算法最好情况是$O(n/m)$，最坏情况由于有了gs表，变为了$O(m+n)$.
+
+### 综合性能
+
+各种模式匹配算法的时间复杂度如下所示：
+
+![1570622593407](assets/1570622593407.png)
